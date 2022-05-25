@@ -56,5 +56,9 @@ ProtectHome=false
 # https://www.freedesktop.org/software/systemd/man/systemd.exec.html#PrivateTmp=
 PrivateTmp=true
 
+# Number of File Descriptors
+# https://www.freedesktop.org/software/systemd/man/systemd.exec.html#Process%20Properties
+LimitNOFILE=65536
+
 [Install]
 WantedBy=multi-user.target

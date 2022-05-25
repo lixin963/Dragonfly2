@@ -113,7 +113,8 @@ var (
 )
 
 const (
-	GCName = "StorageManager"
+	GCName                       = "StorageManager"
+	DefaultMinFDSoftLimit uint64 = 65536
 )
 
 var tracer trace.Tracer
@@ -138,6 +139,8 @@ type storageManager struct {
 
 	subIndexRWMutex       sync.RWMutex
 	subIndexTask2PeerTask map[string][]*localSubTaskStore // key: task id, value: slice of localSubTaskStore
+
+	fdLimit uint64
 }
 
 var _ gc.GC = (*storageManager)(nil)
@@ -171,6 +174,33 @@ func NewStorageManager(storeStrategy config.StoreStrategy, opt *config.StorageOp
 		return nil, fmt.Errorf("not support store strategy: %s", storeStrategy)
 	}
 
+	var (
+		limit     syscall.Rlimit
+		softLimit uint64
+	)
+
+	err = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// use 80% soft limit of number of file descriptor
+	softLimit = limit.Cur / 5 * 4
+
+	if softLimit < DefaultMinFDSoftLimit {
+		limit.Cur = DefaultMinFDSoftLimit
+		if limit.Max < limit.Cur {
+			limit.Max = limit.Cur
+		}
+		err = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &limit)
+		if err != nil {
+			return nil, err
+		}
+		softLimit = limit.Cur / 5 * 4
+	}
+
+	logger.Debugf("soft limit of number of file descriptor is %d, use %d in storage manager", limit.Cur, softLimit)
+
 	s := &storageManager{
 		KeepAlive:             clientutil.NewKeepAlive("storage manager"),
 		storeStrategy:         storeStrategy,
@@ -180,6 +210,7 @@ func NewStorageManager(storeStrategy config.StoreStrategy, opt *config.StorageOp
 		gcInterval:            time.Minute,
 		indexTask2PeerTask:    map[string][]*localTaskStore{},
 		subIndexTask2PeerTask: map[string][]*localSubTaskStore{},
+		fdLimit:               softLimit,
 	}
 
 	for _, o := range moreOpts {
