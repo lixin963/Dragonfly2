@@ -188,6 +188,7 @@ func NewStorageManager(storeStrategy config.StoreStrategy, opt *config.StorageOp
 	softLimit = limit.Cur / 5 * 4
 
 	if softLimit < DefaultMinFDSoftLimit {
+		logger.Warnf("soft limit of number of file descriptor is %d, too low, try to update limit", limit.Cur)
 		limit.Cur = DefaultMinFDSoftLimit
 		if limit.Max < limit.Cur {
 			limit.Max = limit.Cur
