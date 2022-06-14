@@ -20,7 +20,6 @@ package client
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
@@ -109,17 +108,16 @@ func New(target string) (Client, error) {
 }
 
 // NewWithAddrs creates manager client with addresses.
-func NewWithAddrs(netAddrs []dfnet.NetAddr) (Client, error) {
-	for _, netAddr := range netAddrs {
-		ipReachable := reachable.New(&reachable.Config{Address: netAddr.Addr})
-		if err := ipReachable.Check(); err == nil {
-			logger.Infof("use %s address for manager grpc client", netAddr.Addr)
-			return New(netAddr.Addr)
-		}
-		logger.Warnf("%s manager address can not reachable", netAddr.Addr)
-	}
+func NewWithAddrs(netAddr dfnet.NetAddr) (Client, error) {
 
-	return nil, errors.New("can not find available manager addresses")
+	ipReachable := reachable.New(&reachable.Config{Address: netAddr.Addr})
+
+	if err := ipReachable.Check(); err == nil {
+		logger.Infof("use %s address for manager grpc client", netAddr.Addr)
+		return New(netAddr.Addr)
+	}
+	logger.Warnf("%s manager address can not reachable", netAddr.Addr)
+	return nil, nil
 }
 
 // Update SeedPeer configuration.

@@ -120,24 +120,35 @@ func New(opt *config.DaemonOption, d dfpath.Dfpath) (Daemon, error) {
 	if opt.Scheduler.Manager.Enable == true {
 		// New manager client
 		var err error
-		managerClient, err = managerclient.NewWithAddrs(opt.Scheduler.Manager.NetAddrs)
-		if err != nil {
-			return nil, err
+		for _, netAddr := range opt.Scheduler.Manager.NetAddrs {
+			managerClient, err = managerclient.NewWithAddrs(netAddr)
+			if err != nil {
+				return nil, err
+			}
+
+			// New dynconfig client
+			dynconfig, err = config.NewDynconfig(managerClient, d.CacheDir(), opt.Host, opt.Scheduler.Manager.RefreshInterval)
+			if err != nil {
+				return nil, err
+			}
+
+			// Get schedulers from manager
+			schedulers, err = dynconfig.GetSchedulers()
+			if err != nil {
+				return nil, err
+			}
+
+			addrs = schedulersToAvailableNetAddrs(schedulers)
+
+			if len(addrs) != 0 {
+				break
+			}
 		}
 
-		// New dynconfig client
-		dynconfig, err = config.NewDynconfig(managerClient, d.CacheDir(), opt.Host, opt.Scheduler.Manager.RefreshInterval)
-		if err != nil {
-			return nil, err
+		if len(addrs) == 0 {
+			return nil, errors.New("no available manager")
 		}
 
-		// Get schedulers from manager
-		schedulers, err = dynconfig.GetSchedulers()
-		if err != nil {
-			return nil, err
-		}
-
-		addrs = schedulersToAvailableNetAddrs(schedulers)
 	} else {
 		addrs = opt.Scheduler.NetAddrs
 	}
